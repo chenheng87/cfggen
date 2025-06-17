@@ -12,15 +12,13 @@ plugins {
     // Apply the application plugin to add support for building a CLI application in Java.
     id 'application'
     id 'jacoco'
+    id 'com.github.johnrengelman.shadow' version '8.1.1' // 添加 shadow 插件
 //    id 'gg.jte.gradle' version '3.2.1'
 }
 
 repositories {
     // Use Maven Central for resolving dependencies.
     mavenCentral()
-    maven {
-        url 'https://www.graalvm.org/downloads/repo/'
-    }
 }
 
 dependencies {
@@ -108,6 +106,19 @@ tasks.register('fatJar', Jar) {
         configurations.runtimeClasspath.findAll { it.name.endsWith('jar') }.collect { zipTree(it) }
     }
 }
+
+// 添加或更新 shadowJar 配置
+tasks.shadowJar {
+    archiveFileName = 'configgen.jar'
+    manifest.attributes['Main-Class'] = 'configgen.gen.Main'
+
+    // 合并所有依赖进 jar
+    mergeServiceFiles()
+
+    // 排除签名文件防止冲突
+    exclude('META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA')
+}
+
 
 application {
     mainClass = 'configgen.gen.Main'
