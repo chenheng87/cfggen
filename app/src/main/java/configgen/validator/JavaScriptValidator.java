@@ -89,6 +89,12 @@ public class JavaScriptValidator {
                 v.valueMap().forEach((k, val) -> unwrappedMap.put(unwrapValue(k), unwrapValue(val)));
                 yield unwrappedMap;
             }
+            case CfgValue.VInterface v -> {
+                Map<Object, Object> unwrappedMap = new HashMap<>();
+                unwrappedMap.put("type", v.child().schema().name());
+                unwrappedMap.put("data", vStructToMap(v.child()));
+                yield unwrappedMap;
+            }
             case CfgValue.VStruct v -> vStructToMap(v);
             default -> value.toString(); // Fallback for complex types
         };
