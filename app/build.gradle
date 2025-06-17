@@ -18,6 +18,9 @@ plugins {
 repositories {
     // Use Maven Central for resolving dependencies.
     mavenCentral()
+    maven {
+        url 'https://www.graalvm.org/downloads/repo/'
+    }
 }
 
 dependencies {
@@ -49,6 +52,12 @@ dependencies {
         implementation 'org.apache.poi:poi:5.2.4'
         implementation 'org.apache.poi:poi-ooxml:5.2.4'
     }
+
+    // GraalVM JavaScript Engine
+    implementation("org.graalvm.polyglot:polyglot:24.2.1")
+    implementation("org.graalvm.polyglot:js:24.2.1")
+
+    implementation 'com.google.code.gson:gson:2.10.1'
 }
 
 java {

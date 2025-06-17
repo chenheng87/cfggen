@@ -21,12 +21,18 @@ import configgen.tool.*;
 import configgen.util.CachedFiles;
 import configgen.util.LocaleUtil;
 import configgen.util.Logger;
+import configgen.validator.ValidationManager;
+import configgen.validator.ast.EvaluationContext;
+import configgen.validator.ast.Expression;
+import configgen.value.CfgValue;
+import configgen.value.ForeachVStruct;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class Main {
     private static void usage(String reason) {
@@ -57,6 +63,8 @@ public final class Main {
         System.out.println("-----tools");
         System.out.println("    -verify           " + LocaleUtil.getLocaleString("Usage.Verify",
                 "validate all data"));
+        System.out.println("    -validatorEngine  " + LocaleUtil.getLocaleString("Usage.ValidatorEngine",
+                "specify validator engine, can be 'simple' or 'js', default 'simple'"));
         System.out.println("    -searchto         " + LocaleUtil.getLocaleString("Usage.SearchTo",
                 "save search result to file, default stdout"));
         System.out.println("    -searchtag        " + LocaleUtil.getLocaleString("Usage.SearchTag",
@@ -75,8 +83,9 @@ public final class Main {
         if (BuildSettings.isIncludePoi()) {
             System.out.println("    -usepoi           " + LocaleUtil.getLocaleString("Usage.UsePoi",
                     "use poi lib to read Excel file, slow speed, default false"));
-            System.out.println("    -comparepoiandfastexcel   " + LocaleUtil.getLocaleString("Usage.ComparePoiAndFastExcel",
-                    "compare fastexcel lib read to poi lib read"));
+            System.out.println(
+                    "    -comparepoiandfastexcel   " + LocaleUtil.getLocaleString("Usage.ComparePoiAndFastExcel",
+                            "compare fastexcel lib read to poi lib read"));
         }
 
         System.out.println("-----options");
@@ -95,13 +104,11 @@ public final class Main {
         System.out.println("-----" + LocaleUtil.getLocaleString("Usage.GenStart",
                 "parameters in gen are separated by , and the parameter name and parameter value are separated = or :."));
         Generators.getAllProviders().forEach((k, v) -> {
-                    System.out.printf("    -gen %s\n", k);
-                    ParameterInfoCollector parameter = ParameterInfoCollector.of(k);
-                    v.create(parameter);
-                    parameter.print();
-                }
-        );
-
+            System.out.printf("    -gen %s\n", k);
+            ParameterInfoCollector parameter = ParameterInfoCollector.of(k);
+            v.create(parameter);
+            parameter.print();
+        });
 
         Runtime.getRuntime().exit(1);
     }
@@ -161,6 +168,7 @@ public final class Main {
         String langSwitchDefaultLang = "zh_cn";
 
         boolean verify = false;
+        String validatorEngine = "simple";
 
         List<NamedGenerator> generators = new ArrayList<>();
 
@@ -173,10 +181,10 @@ public final class Main {
         List<String> searchParam = null;
 
         String row = System.getProperty("configgen.headrow");
-        //noinspection StatementWithEmptyBody
+        // noinspection StatementWithEmptyBody
         if (row == null || row.equals("2")) {
         } else if (row.equals("3")) {
-            headRow = 3; //第三行可以是类型信息，随便，这里不会读取这个数据，会忽略掉，也就是说类型的权威数据在xml里
+            headRow = 3; // 第三行可以是类型信息，随便，这里不会读取这个数据，会忽略掉，也就是说类型的权威数据在xml里
         } else {
             System.err.printf("-Dconfiggen.headrow，设置为[%s], 它只能设置为2或3，不设置的话默认是2\n", row);
         }
@@ -199,6 +207,12 @@ public final class Main {
 
                 case "-encoding" -> csvDefaultEncoding = args[++i];
                 case "-verify" -> verify = true;
+                case "-validatorengine" -> {
+                    validatorEngine = args[++i].toLowerCase();
+                    if (!validatorEngine.equals("simple") && !validatorEngine.equals("js")) {
+                        usage("-validatorEngine must be 'simple' or 'js'");
+                    }
+                }
                 case "-i18nfile" -> i18nfile = args[++i];
                 case "-i18ncrlfaslf" -> i18ncrlfaslf = true;
                 case "-langswitchdir" -> langSwitchDir = args[++i];
@@ -315,7 +329,18 @@ public final class Main {
 
         if (verify) {
             Logger.verbose("-----start verify");
-            context.makeValue(null);
+            CfgValue cfgValue = context.makeValue(null);
+
+            Logger.verbose("-----start script verify with engine: " + validatorEngine);
+            ValidationManager validationManager = new ValidationManager(validatorEngine);
+            try {
+                Path validationFile = dataDir.resolve("validations.cfg");
+                validationManager.loadScripts(validationFile);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to load validation scripts", e);
+            }
+            validationManager.validate(cfgValue);
+            Logger.verbose("-----script verify success");
         }
 
         for (NamedGenerator ng : generators) {
