@@ -146,7 +146,9 @@ public class ValidationManager {
                 System.err.println("No table found for " + tableRules.getKey() + ", skipping validation.");
                 continue;
             }
-            ForeachVStruct.foreachVTable((vStruct, ctx) -> {
+            for (Map.Entry<CfgValue.Value, CfgValue.VStruct> entry : table.primaryKeyMap().entrySet()) {
+                var vStruct = entry.getValue();
+                var ctx = new ForeachVStruct.Context(table, entry.getKey(), entry.getValue());
                 for (ValidationRule rule : tableRules.getValue()) {
                     try {
                         if (!rule.evaluate(vStruct)) {
@@ -162,7 +164,7 @@ public class ValidationManager {
                                 tableRules.getKey(), key, rule.getDescription(), e.getMessage());
                     }
                 }
-            }, table);
+            }
         }
         if (errorCount.get() > 0) {
             throw new RuntimeException("Configuration validation failed with " + errorCount.get() + " errors.");
