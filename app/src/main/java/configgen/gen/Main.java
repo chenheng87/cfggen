@@ -168,7 +168,7 @@ public final class Main {
         String langSwitchDefaultLang = "zh_cn";
 
         boolean verify = false;
-        String validatorEngine = "simple";
+        String validatorEngine = "js";
 
         List<NamedGenerator> generators = new ArrayList<>();
 
